@@ -1,0 +1,14 @@
+# EMS Roadmap
+- [ ] Database schema, roles, RLS, business-logic functions, demo seed
+- [ ] Auth: sign in, sign up (employee only), forgot/reset password, first-user admin bootstrap
+- [ ] App shell: collapsible sidebar, top bar, breadcrumbs, dark mode, mobile nav
+- [ ] Dashboards (admin/HR + employee)
+- [ ] Employees, Departments
+- [ ] Attendance (check-in/out, corrections)
+- [ ] Leave (apply, approve, cancel, balances)
+- [ ] Payroll (periods, generate, process, payslip PDF)
+- [ ] Performance (reviews, goals)
+- [ ] Notifications, announcements, calendar
+- [ ] Documents (private storage)
+- [ ] Reports + CSV export, audit logs, users, settings
+- [ ] Tests for leave-day and payroll rules
