@@ -1,3 +1,6 @@
+// Toggle this to true when backend API is ready at /api
+const USE_API = false;
+
 const registerForm = document.getElementById('registerForm');
 const loginForm = document.getElementById('loginForm');
 const ticketForm = document.getElementById('ticketForm');
@@ -6,6 +9,7 @@ const dashboard = document.getElementById('dashboard');
 const ticketsList = document.getElementById('tickets');
 const currentUser = document.getElementById('currentUser');
 
+// Local in-memory fallback data (UI will work without backend)
 const localUsers = [
   { id: 1, name: 'Admin User', email: 'admin@hrnav.com' }
 ];
@@ -27,24 +31,60 @@ let localTickets = [
 
 let activeUser = null;
 
-function renderTickets() {
+/* ---------- API wrapper (calls backend when USE_API=true) ---------- */
+async function apiRegister(name, email) {
+  const res = await fetch('/api/auth/register', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name, email })
+  });
+  return res.json();
+}
+
+async function apiLogin(email) {
+  const res = await fetch('/api/auth/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email })
+  });
+  return res.json();
+}
+
+async function apiFetchTickets() {
+  const res = await fetch('/api/tickets');
+  return res.json();
+}
+
+async function apiCreateTicket({ title, description, priority }) {
+  const res = await fetch('/api/tickets', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ title, description, priority })
+  });
+  return res.json();
+}
+
+/* ---------- UI rendering ---------- */
+function renderTickets(tickets = null) {
   ticketsList.innerHTML = '';
 
-  if (!localTickets.length) {
+  const source = tickets || localTickets;
+
+  if (!source.length) {
     ticketsList.innerHTML = '<li class="ticket-item">No tickets yet.</li>';
     return;
   }
 
-  localTickets.forEach(ticket => {
+  source.forEach(ticket => {
     const li = document.createElement('li');
     li.className = 'ticket-item';
 
     li.innerHTML = `
       <div class="ticket-top">
-        <span class="ticket-title">${ticket.title}</span>
+        <span class="ticket-title">${escapeHtml(ticket.title)}</span>
         <span class="ticket-status">Open</span>
       </div>
-      <p>${ticket.description}</p>
+      <p>${escapeHtml(ticket.description)}</p>
       <span class="ticket-priority priority-${ticket.priority}">${ticket.priority}</span>
     `;
 
@@ -57,7 +97,19 @@ function showDashboard(userName) {
   currentUser.textContent = `Logged in as: ${userName}`;
   dashboard.classList.remove('hidden');
   document.querySelector('.auth').style.display = 'none';
-  renderTickets();
+
+  if (USE_API) {
+    apiFetchTickets().then(data => {
+      if (Array.isArray(data)) renderTickets(data);
+      else if (data.tickets) renderTickets(data.tickets);
+      else renderTickets([]);
+    }).catch(err => {
+      console.error('Failed to fetch tickets', err);
+      renderTickets([]);
+    });
+  } else {
+    renderTickets();
+  }
 }
 
 function logout() {
@@ -69,13 +121,38 @@ function logout() {
   currentUser.textContent = '';
 }
 
-registerForm.addEventListener('submit', (event) => {
+/* ---------- Helpers ---------- */
+function escapeHtml(unsafe) {
+  return unsafe
+       .replace(/&/g, "&amp;")
+       .replace(/</g, "&lt;")
+       .replace(/>/g, "&gt;")
+       .replace(/"/g, "&quot;")
+       .replace(/'/g, "&#039;");
+}
+
+/* ---------- Form handlers ---------- */
+registerForm.addEventListener('submit', async (event) => {
   event.preventDefault();
 
   const name = document.getElementById('regName').value.trim();
   const email = document.getElementById('regEmail').value.trim();
 
   if (!name || !email) return;
+
+  if (USE_API) {
+    try {
+      const res = await apiRegister(name, email);
+      if (res?.error) return alert(res.error);
+      const userName = res?.user?.name || name;
+      showDashboard(userName);
+      registerForm.reset();
+    } catch (err) {
+      console.error(err);
+      alert('Registration failed');
+    }
+    return;
+  }
 
   const exists = localUsers.some(user => user.email.toLowerCase() === email.toLowerCase());
 
@@ -90,10 +167,26 @@ registerForm.addEventListener('submit', (event) => {
   registerForm.reset();
 });
 
-loginForm.addEventListener('submit', (event) => {
+loginForm.addEventListener('submit', async (event) => {
   event.preventDefault();
 
   const email = document.getElementById('loginEmail').value.trim();
+  if (!email) return;
+
+  if (USE_API) {
+    try {
+      const res = await apiLogin(email);
+      if (res?.error) return alert(res.error);
+      const userName = res?.user?.name || email;
+      showDashboard(userName);
+      loginForm.reset();
+    } catch (err) {
+      console.error(err);
+      alert('Login failed');
+    }
+    return;
+  }
+
   const foundUser = localUsers.find(user => user.email.toLowerCase() === email.toLowerCase());
 
   if (!foundUser) {
@@ -105,7 +198,7 @@ loginForm.addEventListener('submit', (event) => {
   loginForm.reset();
 });
 
-ticketForm.addEventListener('submit', (event) => {
+ticketForm.addEventListener('submit', async (event) => {
   event.preventDefault();
 
   const title = document.getElementById('ticketTitle').value.trim();
@@ -113,6 +206,21 @@ ticketForm.addEventListener('submit', (event) => {
   const priority = document.getElementById('ticketPriority').value;
 
   if (!title || !description) return;
+
+  if (USE_API) {
+    try {
+      const res = await apiCreateTicket({ title, description, priority });
+      if (res?.error) return alert(res.error);
+      // After create, re-fetch tickets list
+      const data = await apiFetchTickets();
+      renderTickets(Array.isArray(data) ? data : data.tickets || []);
+      ticketForm.reset();
+    } catch (err) {
+      console.error(err);
+      alert('Failed to create ticket');
+    }
+    return;
+  }
 
   localTickets.unshift({
     id: Date.now(),
@@ -127,4 +235,5 @@ ticketForm.addEventListener('submit', (event) => {
 
 logoutBtn.addEventListener('click', logout);
 
-renderTickets();
+// initial render (show local tickets when not logged in)
+if (!USE_API) renderTickets();
