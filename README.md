@@ -1,5 +1,48 @@
 # HR Navigator
 
+## Current backend implementation
+
+The employee directory is connected to the existing Supabase PostgreSQL database:
+
+- Sign in and sign out use Supabase Auth.
+- `getPeopleDirectory` reads employee and department records through a protected TanStack server function.
+- `createEmployee` validates employee fields on the server and writes to PostgreSQL.
+- `reviewLeaveRequest` uses the database leave-review workflow for approve/decline actions.
+- Dashboard cards and charts read employee, department, leave-request, and company-event records.
+- Both functions require a valid Supabase session and an `admin` or `hr_manager` role. The existing database row-level security policies remain enabled as a second permission check.
+- Hiring and employee satisfaction are not shown because this database schema does not yet contain corresponding data sources.
+
+### Database setup
+
+This repository is already connected to the Supabase project identified in [`supabase/config.toml`](./supabase/config.toml). Supabase provides the hosted PostgreSQL database; the SQL migration creates the app tables, access policies, functions, and starter/demo records. The migration has not been applied automatically by the website.
+
+1. Open the project in Supabase Dashboard and check that the project is active.
+2. Open **SQL Editor**, open [`drizzle/migrations/0000_migration.sql`](./drizzle/migrations/0000_migration.sql) from this repository, and run its contents once. It depends on Supabase Auth (`auth.users`) and must run in the linked Supabase database, not a standalone PostgreSQL server. Do not run it again after it succeeds; it is an initial schema migration, not an idempotent script.
+3. In **Authentication → Providers → Email**, disable public sign-ups after onboarding so an unknown visitor cannot try to claim the initial administrator account.
+4. In **Authentication → Users**, invite your own email address. The migration's auth trigger assigns the first user the `admin` role. For an existing project with users, grant the role to your account in SQL Editor after replacing the placeholder email:
+
+   ```sql
+   insert into public.user_roles (user_id, role)
+   select id, 'admin'::public.app_role
+   from auth.users
+   where lower(email) = lower('you@your-domain.com')
+   on conflict (user_id, role) do nothing;
+   ```
+
+5. Confirm that the first admin can sign in and that employee/department data appears. The migration includes demo records marked `is_demo`.
+
+### Local setup
+
+For a local UI walkthrough, development mode shows a mock-only sign-in instead of contacting Supabase Auth. Use email `demo@peopleflow.test` and password `PeopleflowDemo2026!`, or enter them directly on the screen. The demo dashboard uses sample data; additions and leave decisions are temporary and are lost on refresh. This mode is enabled only by Vite's development flag and is not available in production builds.
+
+1. Copy [`.env.example`](./.env.example) to `.env` and fill in the project's URL and **publishable** key from Supabase **Project Settings → API**. Keep the server and Vite variables for URL/key paired to the same project. The project's URL is also in [`supabase/config.toml`](./supabase/config.toml).
+2. Never put a Supabase secret/service-role key in a `VITE_` variable, browser code, or a checked-in file.
+3. Run `npm.cmd run dev` in Windows PowerShell and open the Vite URL. Use the demo credentials above for a local preview. Production builds continue to use the real Supabase sign-in and database.
+
+If the dashboard says the database schema is not installed, complete the Database setup steps above. This workspace cannot apply the migration to the hosted database on your behalf because it has no database-owner credentials; do not paste service-role or database passwords into chat.
+
+The employee server functions are in [`src/features/employees/employees.functions.ts`](./src/features/employees/employees.functions.ts); the sign-in screen and database-backed directory are in [`src/routes/index.tsx`](./src/routes/index.tsx).
+
 # MASTER PROMPT: PROJECT 26 — ADVANCED EMPLOYEE MANAGEMENT SYSTEM
 
 ## 1. YOUR ROLE
@@ -30,6 +73,7 @@ All role permissions must be enforced on the server, not merely hidden in the fr
 ## 3. MANDATORY TECHNOLOGY STACK
 
 CLIENT:
+
 - React with JavaScript
 - Vite
 - HTML5
@@ -41,6 +85,7 @@ CLIENT:
 - Responsive CSS and accessible UI components
 
 SERVER:
+
 - Node.js
 - Express.js
 - REST API
@@ -52,6 +97,7 @@ SERVER:
 - Request logging and security middleware
 
 DATABASE:
+
 - PostgreSQL only
 - Use a maintained PostgreSQL driver or a suitable ORM such as Prisma
 - Provide database migrations and seed scripts
@@ -59,6 +105,7 @@ DATABASE:
 - Do not replace PostgreSQL with Firebase, MongoDB, localStorage, or mock data
 
 AUTHENTICATION AND SECURITY:
+
 - Short-lived access tokens
 - A secure refresh-token strategy, preferably using HttpOnly, Secure, SameSite cookies where deployment permits
 - bcrypt password hashing
@@ -77,69 +124,69 @@ AUTHENTICATION AND SECURITY:
 Create a clearly separated full-stack project:
 
 employee-management/
-  client/
-    public/
-    src/
-      assets/
-      components/
-      layouts/
-      pages/
-      dashboard/
-      features/
-        auth/
-        employees/
-        departments/
-        attendance/
-        leave/
-        payroll/
-        performance/
-        notifications/
-        reports/
-        documents/
-      services/
-      hooks/
-      context/
-      utils/
-      styles/
-      App.jsx
-      main.jsx
-    package.json
-    .env.example
-    vite.config.js
+client/
+public/
+src/
+assets/
+components/
+layouts/
+pages/
+dashboard/
+features/
+auth/
+employees/
+departments/
+attendance/
+leave/
+payroll/
+performance/
+notifications/
+reports/
+documents/
+services/
+hooks/
+context/
+utils/
+styles/
+App.jsx
+main.jsx
+package.json
+.env.example
+vite.config.js
 
-  server/
-    src/
-      config/
-      routes/
-      controllers/
-      services/
-      repositories/
-      middleware/
-      validators/
-      utils/
-      jobs/
-      tests/
-      app.js
-      server.js
-    prisma/
-      schema.prisma
-      migrations/
-      seed.js
-    package.json
-    .env.example
+server/
+src/
+config/
+routes/
+controllers/
+services/
+repositories/
+middleware/
+validators/
+utils/
+jobs/
+tests/
+app.js
+server.js
+prisma/
+schema.prisma
+migrations/
+seed.js
+package.json
+.env.example
 
-  docs/
-    architecture.md
-    database-design.md
-    api-documentation.md
-    security.md
-    user-guide.md
-    deployment-guide.md
+docs/
+architecture.md
+database-design.md
+api-documentation.md
+security.md
+user-guide.md
+deployment-guide.md
 
-  .gitignore
-  docker-compose.yml
-  package.json
-  README.md
+.gitignore
+docker-compose.yml
+package.json
+README.md
 
 Adapt the structure where technically necessary, but preserve the distinct client and server directories. Include every file required to run the application. Do not reference nonexistent files.
 
@@ -148,6 +195,7 @@ Adapt the structure where technically necessary, but preserve the distinct clien
 Build a premium enterprise HR dashboard.
 
 Design requirements:
+
 - Clean professional layout
 - Collapsible sidebar
 - Top navigation bar
@@ -167,6 +215,7 @@ Design requirements:
 - Consistent typography, spacing, colors, icons, and buttons
 
 Suggested navigation:
+
 - Dashboard
 - Employees
 - Departments
@@ -189,6 +238,7 @@ Use realistic demonstration data only through the database seed script. Clearly 
 ## 6. AUTHENTICATION AND ROLE PERMISSIONS
 
 Implement:
+
 - User registration with appropriate restrictions
 - Login and logout
 - Password hashing
@@ -203,6 +253,7 @@ Implement:
 Registration must not allow anyone to become an administrator by submitting an arbitrary role. Public registration, if enabled, must create only an employee or a pending account. Initial administrator creation must use a secure seed or bootstrap procedure.
 
 ADMIN permissions:
+
 - Full authorized system administration
 - Manage users, employees, departments, and company settings
 - Configure roles and permissions
@@ -211,6 +262,7 @@ ADMIN permissions:
 - Review audit logs
 
 HR_MANAGER permissions:
+
 - Manage employee records
 - Manage departments as permitted
 - Review attendance and leave requests
@@ -220,6 +272,7 @@ HR_MANAGER permissions:
 - Publish company announcements
 
 EMPLOYEE permissions:
+
 - View their own profile
 - Update permitted personal information
 - Check in and check out
@@ -237,6 +290,7 @@ Enforce object-level authorization. Employees must never access another employee
 Implement full create, read, update, and delete or archive functionality.
 
 Employee fields:
+
 - Employee database ID
 - Unique employee number, such as EMP101
 - First and last name
@@ -256,6 +310,7 @@ Employee fields:
 - Created and updated timestamps
 
 Requirements:
+
 - Unique employee number and appropriate email constraints
 - Search by name, employee number, email, department, or designation
 - Filters by department, status, and employment type
@@ -270,6 +325,7 @@ Protect sensitive employee information and restrict access according to role.
 ## 8. DEPARTMENT MANAGEMENT MODULE
 
 Implement:
+
 - Create departments
 - Edit departments
 - View department details
@@ -285,6 +341,7 @@ Use foreign keys and consistent database transactions.
 ## 9. ATTENDANCE MANAGEMENT MODULE
 
 Implement:
+
 - Employee check-in
 - Employee check-out
 - Server-generated timestamps
@@ -308,12 +365,14 @@ If GPS attendance is implemented, request explicit browser permission, validate 
 ## 10. LEAVE MANAGEMENT MODULE
 
 Leave types:
+
 - Casual Leave
 - Sick Leave
 - Paid Leave
 - Unpaid Leave
 
 Implement:
+
 - Leave balance tracking
 - Leave application
 - Start date and end date
@@ -338,6 +397,7 @@ Employees must not approve their own leave requests unless a specifically author
 ## 11. PAYROLL MANAGEMENT MODULE
 
 Implement a secure payroll subsystem with:
+
 - Basic salary
 - Allowances
 - Bonuses
@@ -363,6 +423,7 @@ Implement a configurable payroll calculation service. Do not hardcode tax rates 
 Use decimal-safe numeric types and appropriate currency precision. Never use JavaScript floating-point arithmetic for financial calculations without a safe decimal strategy.
 
 Implement:
+
 - Payroll period creation
 - Draft payroll
 - Payroll preview
@@ -382,6 +443,7 @@ Restrict payroll access to authorized roles and employees' own payslips.
 ## 12. PERFORMANCE MANAGEMENT MODULE
 
 Implement:
+
 - Performance review cycles
 - Review periods
 - Employee goals
@@ -401,6 +463,7 @@ If AI-powered performance insights are added, treat them as optional decision-su
 ## 13. DASHBOARD AND ANALYTICS
 
 Admin and HR dashboards must display database-backed information:
+
 - Total employees
 - Active employees
 - Employees present today
@@ -415,6 +478,7 @@ Admin and HR dashboards must display database-backed information:
 - Upcoming performance reviews
 
 Employee dashboard:
+
 - Personal profile summary
 - Today's attendance
 - Attendance history
@@ -429,6 +493,7 @@ Use efficient database aggregation queries. All charts and metrics must be based
 ## 14. NOTIFICATIONS AND COMPANY CALENDAR
 
 Implement in-app notifications for:
+
 - Leave approved or rejected
 - Payroll processed
 - Missing attendance
@@ -437,6 +502,7 @@ Implement in-app notifications for:
 - Upcoming holidays and events
 
 Include:
+
 - Notification list
 - Read/unread status
 - Mark-as-read action
@@ -451,6 +517,7 @@ Never claim an email, push notification, or real-time delivery succeeded unless 
 ## 15. REPORTS AND EXPORTS
 
 Provide reports for:
+
 - Employee directory
 - Department staffing
 - Attendance
@@ -469,6 +536,7 @@ Do not expose confidential payroll or employee information through public downlo
 Where implemented, allow authorized users to upload, categorize, view, and download employee documents.
 
 Requirements:
+
 - File size limits
 - Allowed file types
 - Server-side file validation
@@ -483,6 +551,7 @@ Do not expose private documents in a public static directory.
 ## 17. DATABASE DESIGN
 
 Create normalized PostgreSQL tables for at least:
+
 - users
 - roles or permissions
 - employees
@@ -508,6 +577,7 @@ Create normalized PostgreSQL tables for at least:
 Add any additional tables needed for a correct implementation.
 
 Requirements:
+
 - Primary keys
 - Foreign keys
 - Unique constraints
